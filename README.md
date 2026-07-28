@@ -206,9 +206,7 @@ detection rules` → **Add** → *Rule type: Registry*):
 |---|---|
 | Key path | `HKEY_LOCAL_MACHINE\SOFTWARE\M365LanguagePacks` |
 | Value name | `InstallComplete` |
-| Detection method | String comparison |
-| Operator | Equals |
-| Value | `True` |
+| Detection method | Value exists |
 | Associated with a 32-bit app on 64-bit clients | **No** |
 
 *Value exists* is fine too, and a bit more forgiving since it doesn't care what the
