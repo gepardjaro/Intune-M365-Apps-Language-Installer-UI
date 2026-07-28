@@ -1,0 +1,16 @@
+    # 1. Define the temporary registry path
+        $TempRegPath = "HKLM:\SOFTWARE\M365LanguagePacks"
+
+        # 2. Create the registry key so Intune sees it immediately upon exit
+        if (-not (Test-Path $TempRegPath)) {
+            New-Item -Path $TempRegPath -Force | Out-Null
+        }
+        New-ItemProperty -Path $TempRegPath -Name "InstallComplete" -Value "True" -PropertyType String -Force | Out-Null
+        Write-ADTLogEntry -Message "Created temporary detection registry key at $TempRegPath"
+
+        # 3. Spawn a detached background process to delete the key after 15 seconds
+        # Note: If Intune randomly reports "Failed", increase the 30 seconds to 60.
+        $CleanupCommand = "Start-Sleep -Seconds 30; Remove-Item -Path '$TempRegPath' -Force -Recurse -ErrorAction SilentlyContinue"
+        
+        Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$CleanupCommand`""
+        Write-ADTLogEntry -Message "Launched detached background process to self-destruct the registry key in selected seconds."

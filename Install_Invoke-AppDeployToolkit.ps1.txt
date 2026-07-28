@@ -1,0 +1,48 @@
+# 1. Define paths (Updated strictly for PSADT v4 session variables)
+        $UIScriptPath = "$($adtSession.DirFiles)\LanguageSelector.ps1"
+        $OdtSetup = "$($adtSession.DirFiles)\setup.exe"
+        $XmlPath = "$($adtSession.DirFiles)\LanguageConfig.xml"
+        $LangFile = "$env:PUBLIC\M365_SelectedLangs.txt"
+
+        # 2. Trigger the GUI as the logged-in user and wait for it to finish
+        Write-ADTLogEntry -Message "Launching Language Selector UI to the user..."
+        Start-ADTProcessAsUser -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$UIScriptPath`"" -WaitForChildProcesses
+
+        # 3. Check if the user selected languages and clicked "Install"
+        if (Test-Path $LangFile) {
+            $SelectedLangs = Get-Content $LangFile
+            Write-ADTLogEntry -Message "User selected the following languages: $($SelectedLangs -join ', ')"
+
+            # 4. Dynamically generate the ODT XML
+            $XmlContent = @"
+<Configuration>
+  <Add Version="MatchInstalled">
+    <Product ID="LanguagePack">
+"@
+            foreach ($lang in $SelectedLangs) {
+                $XmlContent += "      <Language ID=`"$lang`" />`n"
+            }
+            
+            $XmlContent += @"
+    </Product>
+  </Add>
+  <Display Level="None" AcceptEULA="TRUE" />
+  <Logging Level="Standard" Path="$env:TEMP" />
+</Configuration>
+"@
+            
+            # Save the XML
+            $XmlContent | Out-File -FilePath $XmlPath -Encoding UTF8 -Force
+            Write-ADTLogEntry -Message "Generated ODT XML at $XmlPath"
+
+            # 5. Execute ODT Setup
+            Write-ADTLogEntry -Message "Running Office Deployment Tool to install languages..."
+            Start-ADTProcess -FilePath $OdtSetup -ArgumentList "/configure `"$XmlPath`"" -WindowStyle 'Hidden'
+
+            # Cleanup
+            Remove-Item $LangFile -Force -ErrorAction SilentlyContinue
+
+        } else {
+            Write-ADTLogEntry -Message "User cancelled the UI or selected no languages. Exiting gracefully."
+            Close-ADTSession -ExitCode 1602
+        }
