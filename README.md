@@ -233,7 +233,7 @@ list of installed languages.
 | [`LanguageSelector.ps1`](LanguageSelector.ps1) | The picker UI. Goes in `Files\`. Runs in the user session; writes selected locale codes to `%PUBLIC%\M365_SelectedLangs.txt`. |
 | [`Install_Invoke-AppDeployToolkit.ps1.txt`](Install_Invoke-AppDeployToolkit.ps1.txt) | Paste into the **Install** section. UI launch → XML generation → ODT install. |
 | [`Post-Install_Invoke-AppDeployToolkit.ps1.txt`](Post-Install_Invoke-AppDeployToolkit.ps1.txt) | Paste into the **Post-Install** section. Self-destructing detection marker. |
-| [`Detect-M365LanguagePack.ps1`](Detect-M365LanguagePack.ps1) | Intune custom detection script. Checks `HKLM:\SOFTWARE\M365LanguagePacks`. |
+| [`Detect-M365LanguagePack.ps1`](Detect-M365LanguagePack.ps1) | Intune custom detection script. Checks `HKLM:\SOFTWARE\M365LanguagePacks` for the `InstallComplete` value written by Post-Install. |
 
 The two `.txt` files are `.txt` deliberately: they are fragments meant to be
 pasted into an existing `Invoke-AppDeployToolkit.ps1`, not run on their own.
@@ -279,10 +279,6 @@ string so names that themselves contain parentheses, like "Chinese
 
 ## Notes and known limitations
 
-- **Registry value names differ between the two scripts.** The Post-Install
-  section writes `InstallComplete`; `Detect-M365LanguagePack.ps1` reads
-  `InstalledLanguages`. Both act on the same key,
-  `HKLM:\SOFTWARE\M365LanguagePacks`.
 - **Uninstall is not implemented.** Removing an Office language pack is not a
   clean operation, and the app is designed as a re-runnable installer rather than
   something with a lifecycle. Leave the Uninstall section as the toolkit default.
