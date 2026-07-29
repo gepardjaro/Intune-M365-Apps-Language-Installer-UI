@@ -20,11 +20,12 @@ service desk.
 - [How it works](#how-it-works)
 - [What you need](#what-you-need)
 - [Installation](#installation)
-  - [1. Build the PSADT package folder](#1-build-the-psadt-package-folder)
-  - [2. Paste the Install section](#2-paste-the-install-section)
-  - [3. Paste the Post-Install section](#3-paste-the-post-install-section)
-  - [4. Add the company logo](#4-add-the-company-logo)
-  - [5. Package and upload to Intune](#5-package-and-upload-to-intune)
+  - [1. Close conflicting Office apps](#1-close-conflicting-office-apps)
+  - [2. Build the PSADT package folder](#2-build-the-psadt-package-folder)
+  - [3. Paste the Install section](#3-paste-the-install-section)
+  - [4. Paste the Post-Install section](#4-paste-the-post-install-section)
+  - [5. Add the company logo](#5-add-the-company-logo)
+  - [6. Package and upload to Intune](#6-package-and-upload-to-intune)
 - [Intune configuration](#intune-configuration)
   - [Detection rule options](#detection-rule-options)
 - [The self-destructing detection key](#the-self-destructing-detection-key)
@@ -71,23 +72,42 @@ SYSTEM.
 | **PSADT 4.1.x** | A working package folder — the toolkit's standard `Invoke-AppDeployToolkit.ps1` frontend |
 | **ODT `setup.exe`** | Grab it from [Microsoft](https://www.microsoft.com/en-us/download/details.aspx?id=49117). It isn't shipped in this repo, so fetch a current copy yourself. |
 | **Microsoft 365 Apps already installed** | The generated XML uses `Version="MatchInstalled"`, so it layers languages onto whatever is already there |
-| **`company_logo.png`** *(optional)* | Your own branding. See [step 4](#4-add-the-company-logo). |
+| **`company_logo.png`** *(optional)* | Your own branding. See [step 5](#5-add-the-company-logo). |
 | **Windows PowerShell 5.1** | The snippets call `powershell.exe` (5.1) on purpose, not `pwsh` |
 
 ## Installation
 
-### 1. Build the PSADT package folder
+### 1. Close Office apps
+
+In `Invoke-AppDeployToolkit.ps1`, find the
+`AppProcessesToClose` hashtable passed to `Show-ADTInstallationWelcome` and
+replace its array with the contents of
+[`AppProcessesToClose.txt`](Setup%20Files/AppProcessesToClose.txt):
+
+```powershell
+AppProcessesToClose = @(
+    @{ Name = 'excel';    Description = 'Microsoft Excel' }
+    @{ Name = 'winword';  Description = 'Microsoft Word' }
+    @{ Name = 'outlook';  Description = 'Microsoft Outlook' }
+    @{ Name = 'powerpnt'; Description = 'Microsoft PowerPoint' }
+    @{ Name = 'onenote';  Description = 'Microsoft OneNote' }
+    @{ Name = 'msaccess'; Description = 'Microsoft Access' }
+    @{ Name = 'mspub';    Description = 'Microsoft Publisher' }
+)
+```
+
+### 2. Build the PSADT package folder
 
 Drop these into your PSADT package's **`Files\`** folder:
 
 ```
 YourPSADTPackage\
-├── Invoke-AppDeployToolkit.ps1      ← you paste into this (steps 2 and 3)
+├── Invoke-AppDeployToolkit.ps1      ← you paste into this (steps 3 and 4)
 ├── PSAppDeployToolkit\              ← PSADT 4.1.x module
 ├── Files\
 │   ├── LanguageSelector.ps1         ← from this repo
 │   ├── setup.exe                    ← ODT, download from Microsoft
-│   ├── company_logo.png             ← your logo (optional, see step 4)
+│   ├── company_logo.png             ← your logo (optional, see step 5)
 │   └── LanguageConfig.xml           ← generated at runtime, do not create by hand
 └── ...
 ```
@@ -99,9 +119,9 @@ at runtime**. That's fine for the usual pattern, where the package is staged to 
 local folder before `Invoke-AppDeployToolkit.exe` fires. Run it straight off a
 read-only share and it will fail.
 
-### 2. Paste the Install section
+### 3. Paste the Install section
 
-Open [`Install_Invoke-AppDeployToolkit.ps1.txt`](Install_Invoke-AppDeployToolkit.ps1.txt)
+Open [`Install_Invoke-AppDeployToolkit.ps1.txt`](Setup%20Files/Install_Invoke-AppDeployToolkit.ps1.txt)
 and paste the contents into `Invoke-AppDeployToolkit.ps1`, under the Install
 marker:
 
@@ -125,9 +145,9 @@ What that code does, in order:
 6. Deletes the handoff file
 7. If there's no file, the user backed out — it calls `Close-ADTSession -ExitCode 1602`
 
-### 3. Paste the Post-Install section
+### 4. Paste the Post-Install section
 
-Same idea with [`Post-Install_Invoke-AppDeployToolkit.ps1.txt`](Post-Install_Invoke-AppDeployToolkit.ps1.txt),
+Same idea with [`Post-Install_Invoke-AppDeployToolkit.ps1.txt`](Setup%20Files/Post-Install_Invoke-AppDeployToolkit.ps1.txt),
 under the Post-Install marker:
 
 ```powershell
@@ -143,7 +163,7 @@ $adtSession.InstallPhase = "Post-$($adtSession.DeploymentType)"
 This writes the detection marker and schedules its own deletion. There's a whole
 section on why below: [The self-destructing detection key](#the-self-destructing-detection-key).
 
-### 4. Add the company logo
+### 5. Add the company logo
 
 **Yes, `company_logo.png` goes in `Files\`**, right next to
 `LanguageSelector.ps1`. The script looks for it relative to itself:
@@ -166,7 +186,7 @@ broken logo just gives you a dialog with a blank white header. Nothing breaks.
 
 No logo is committed here. Bring your own.
 
-### 5. Package and upload to Intune
+### 6. Package and upload to Intune
 
 Wrap the folder with `IntuneWinAppUtil.exe` like any other PSADT package, then set
 it up using the table below.
@@ -180,7 +200,7 @@ it up using the table below.
 | Install behavior | **System** |
 | Device restart behavior | Determine behavior based on return codes |
 | Return code `1602` | Map it however suits you — it means "user cancelled the picker" |
-| Detection rule | Either a **custom script** → [`Detect-M365LanguagePack.ps1`](Detect-M365LanguagePack.ps1), or a **manually configured registry rule** — see [Detection rule options](#detection-rule-options) |
+| Detection rule | Either a **custom script** → [`Detect-M365LanguagePack.ps1`](Setup%20Files/Detect-M365LanguagePack.ps1), or a **manually configured registry rule** — see [Detection rule options](#detection-rule-options) |
 | Run script as 32-bit | No |
 
 > [!IMPORTANT]
@@ -196,7 +216,7 @@ Both options hunt for the same marker: `HKLM:\SOFTWARE\M365LanguagePacks\Install
 written by the Post-Install section. Pick one. Don't configure both.
 
 **Option A — custom detection script** (`Rules format: Use a custom detection script`):
-upload [`Detect-M365LanguagePack.ps1`](Detect-M365LanguagePack.ps1), set *Run
+upload [`Detect-M365LanguagePack.ps1`](Setup%20Files/Detect-M365LanguagePack.ps1), set *Run
 script as 32-bit* to **No** and *Enforce script signature check* to **No**.
 
 **Option B — manually configured registry rule** (`Rules format: Manually configure
@@ -268,10 +288,11 @@ of which languages went in.
 
 | File | Role |
 |---|---|
-| [`LanguageSelector.ps1`](LanguageSelector.ps1) | The picker UI. Goes in `Files\`. Runs in the user session and writes selected locale codes to `%PUBLIC%\M365_SelectedLangs.txt`. |
-| [`Install_Invoke-AppDeployToolkit.ps1.txt`](Install_Invoke-AppDeployToolkit.ps1.txt) | Paste into the **Install** section. UI launch → XML generation → ODT install. |
-| [`Post-Install_Invoke-AppDeployToolkit.ps1.txt`](Post-Install_Invoke-AppDeployToolkit.ps1.txt) | Paste into the **Post-Install** section. The self-destructing detection marker. |
-| [`Detect-M365LanguagePack.ps1`](Detect-M365LanguagePack.ps1) | Intune custom detection script. Checks `HKLM:\SOFTWARE\M365LanguagePacks` for the `InstallComplete` value that Post-Install writes. |
+| [`LanguageSelector.ps1`](Setup%20Files/LanguageSelector.ps1) | The picker UI. Goes in `Files\`. Runs in the user session and writes selected locale codes to `%PUBLIC%\M365_SelectedLangs.txt`. |
+| [`AppProcessesToClose.txt`](Setup%20Files/AppProcessesToClose.txt) | Paste into the **Pre-Install** section's `CloseProcesses` array. Prompts the user to close Excel, Word, Outlook, PowerPoint, OneNote, Access, and Publisher before install. |
+| [`Install_Invoke-AppDeployToolkit.ps1.txt`](Setup%20Files/Install_Invoke-AppDeployToolkit.ps1.txt) | Paste into the **Install** section. UI launch → XML generation → ODT install. |
+| [`Post-Install_Invoke-AppDeployToolkit.ps1.txt`](Setup%20Files/Post-Install_Invoke-AppDeployToolkit.ps1.txt) | Paste into the **Post-Install** section. The self-destructing detection marker. |
+| [`Detect-M365LanguagePack.ps1`](Setup%20Files/Detect-M365LanguagePack.ps1) | Intune custom detection script. Checks `HKLM:\SOFTWARE\M365LanguagePacks` for the `InstallComplete` value that Post-Install writes. |
 
 Those two files end in `.txt` on purpose. They're fragments meant to be pasted
 into an existing `Invoke-AppDeployToolkit.ps1`, not scripts you run on their own.
